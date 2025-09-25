@@ -1,2 +1,1 @@
-include(":app")
-project(":app").projectDir = file(".")
+// Extension project - no app module needed
