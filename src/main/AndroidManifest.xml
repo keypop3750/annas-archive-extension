@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:label="Anna's Archive">
+        <meta-data
+            android:name="tachiyomi.extension.class"
+            android:value="eu.kanade.tachiyomi.extension.all.annasarchive.AnnasArchiveFactory" />
+        <meta-data
+            android:name="tachiyomi.extension.lang"
+            android:value="all" />
+        <meta-data
+            android:name="tachiyomi.extension.name"
+            android:value="Anna's Archive" />
+        <meta-data
+            android:name="tachiyomi.extension.nsfw"
+            android:value="false" />
+    </application>
+
+</manifest>

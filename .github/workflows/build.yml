@@ -1,0 +1,103 @@
+name: Build Extension
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      
+    - name: Cache Gradle dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: Make gradlew executable
+      run: chmod +x ./gradlew
+      
+    - name: Build APK
+      run: ./gradlew assembleRelease --no-daemon
+      
+    - name: Sign APK
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      uses: r0adkll/sign-android-release@v1
+      with:
+        releaseDirectory: build/outputs/apk/release
+        signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+        alias: ${{ secrets.ALIAS }}
+        keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
+        keyPassword: ${{ secrets.KEY_PASSWORD }}
+        
+    - name: Rename APK
+      run: |
+        cd build/outputs/apk/release
+        mv *.apk anna-archive-v${{ github.ref_name }}.apk
+        
+    - name: Upload APK
+      uses: actions/upload-artifact@v3
+      with:
+        name: anna-archive-extension
+        path: build/outputs/apk/release/*.apk
+        
+    - name: Update index.min.json
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      run: |
+        # Update version in index.min.json
+        VERSION=${GITHUB_REF#refs/tags/v}
+        sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" index.min.json
+        sed -i "s/\"apk\": \"anna-archive-v.*\.apk\"/\"apk\": \"anna-archive-v$VERSION.apk\"/" index.min.json
+        
+    - name: Create Release
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref_name }}
+        release_name: Anna's Archive Extension v${{ github.ref_name }}
+        body: |
+          ## Changes
+          - Extension for accessing Anna's Archive books
+          - Compatible with Tachiyomi/Yokai
+          
+          ## Installation
+          1. Download the APK file below
+          2. Install in Tachiyomi/Yokai through Extensions → Install APK
+          
+          ## Repository URL
+          Add to Yokai: `https://raw.githubusercontent.com/${{ github.repository }}/main/index.min.json`
+        draft: false
+        prerelease: false
+        
+    - name: Upload Release Asset
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: build/outputs/apk/release/anna-archive-v${{ github.ref_name }}.apk
+        asset_name: anna-archive-v${{ github.ref_name }}.apk
+        asset_content_type: application/vnd.android.package-archive
